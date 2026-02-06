@@ -126,7 +126,7 @@ def plot_latent_trajectories(
     
     # Get latent dimension
     if len(latent_trajectories.shape) == 2:
-        latent_trajectories = latent_trajectories.unsqueeze(0)
+        latent_trajectories = np.expand_dims(latent_trajectories, axis=0)
     
     num_samples, time_steps, latent_dim = latent_trajectories.shape
     
