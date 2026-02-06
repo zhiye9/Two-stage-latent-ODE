@@ -1,0 +1,101 @@
+# Configuration for Two-Stage Latent ODE Model
+
+# Model Architecture
+model:
+  input_dim: 1  # Dimension of input features (e.g., glucose)
+  latent_dim: 32  # Dimension of latent space
+  output_dim: 1  # Dimension of output predictions
+  
+  # Encoder settings
+  encoder:
+    hidden_dim: 64
+    num_layers: 1
+    rnn_type: 'gru'  # Options: 'gru', 'lstm'
+    bidirectional: false
+  
+  # ODE settings
+  ode:
+    hidden_dim: 64
+    num_layers: 2
+    method: 'dopri5'  # Options: 'dopri5', 'rk4', 'euler', 'midpoint'
+    rtol: 0.001
+    atol: 0.0001
+  
+  # Decoder settings
+  decoder:
+    hidden_dim: 64
+    num_layers: 2
+
+# Training Configuration
+training:
+  batch_size: 32
+  num_epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  
+  # Loss settings
+  loss:
+    kl_weight: 0.1  # Weight for KL divergence term
+    recon_loss_type: 'mse'  # Options: 'mse', 'mae'
+  
+  # Optimizer
+  optimizer: 'adam'  # Options: 'adam', 'sgd', 'rmsprop'
+  
+  # Learning rate scheduler
+  scheduler:
+    type: 'step'  # Options: 'step', 'cosine', 'plateau'
+    step_size: 30
+    gamma: 0.1
+
+# Data Configuration
+data:
+  # Observation window (minutes)
+  obs_window: 60
+  
+  # Prediction window (minutes)
+  pred_window: 180
+  
+  # Sampling frequency (minutes)
+  sampling_freq: 5
+  
+  # Train/val/test split
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  
+  # Data augmentation
+  augmentation:
+    noise_std: 0.01
+    time_jitter: 2  # minutes
+
+# Evaluation Configuration
+evaluation:
+  # Clinical thresholds for glucose (mg/dL)
+  glucose_low_threshold: 70
+  glucose_high_threshold: 180
+  
+  # Metrics to compute
+  metrics:
+    - 'rmse'
+    - 'mae'
+    - 'mape'
+    - 'tir'  # Time in range
+    - 'glucose_variability'
+
+# Paths
+paths:
+  data_dir: 'data'
+  checkpoint_dir: 'checkpoints'
+  results_dir: 'results'
+  log_dir: 'logs'
+
+# Device
+device: 'cuda'  # Options: 'cuda', 'cpu'
+
+# Random seed for reproducibility
+seed: 42
+
+# Logging
+logging:
+  log_interval: 10  # Log every N batches
+  save_interval: 10  # Save checkpoint every N epochs
