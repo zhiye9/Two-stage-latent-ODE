@@ -18,9 +18,11 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import math
 import os
 import random
 import time
+from dataclasses import asdict
 from typing import Callable, Dict, List
 
 import numpy as np
@@ -32,7 +34,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 
 from analysis import collect_stage1_predictions, collect_stage2_predictions, per_group_mse_table
-from config import build_argument_parser, get_temperature_schedule, load_config
+from config import Config, build_argument_parser, load_config
 from model import FiLMZ0Predictor, GroupedLatentODE, stage1_loss, stage2_loss
 from preprocessing import (MetabolitePreprocessor, StaticFeatureProcessor, TrajectoryDataset, _id_sort_key,
                            _worker_init_fn, assign_groups, collate_fn, normalize_subject_id, read_static_csv, wide_to_long)
@@ -135,7 +137,8 @@ def main() -> None:
 
     def train_epoch(epoch: int) -> Dict[str, float]:
         model.train()
-        model.gating.set_temperature(get_temperature_schedule(epoch, s1))
+        model.gating.set_temperature(max(
+            s1.temperature_init * math.exp(-s1.temperature_anneal_rate * epoch), s1.temperature_min))
         batches = []
         for batch in train_loader:
             optimizer.zero_grad()
@@ -160,7 +163,7 @@ def main() -> None:
 
     # checkpoints
     checkpoint = {
-        "config": cfg.to_dict(),
+        "config": asdict(cfg),
         "n_metabolites": len(data["metabolite_names"]),
         "metabolite_names": list(data["metabolite_names"]),
         "group_names": list(data["group_names"]),

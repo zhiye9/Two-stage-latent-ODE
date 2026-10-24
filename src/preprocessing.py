@@ -13,7 +13,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-from config import GROUP_RULES as group_rules, DataConfig
+from config import group_rules, DataConfig
 
 logger = logging.getLogger("preprocessing")
 
@@ -66,8 +66,6 @@ def wide_to_long(wide_df: pd.DataFrame, subject_column: str) -> Tuple[pd.DataFra
 
 # metabolite preprocessor
 class MetabolitePreprocessor:
-    """Filtering, log transform and z-scoring fitted on the training subjects."""
-
     def __init__(self, cfg: DataConfig):
         self.missingness_threshold = cfg.missingness_threshold
         self.variance_threshold = cfg.variance_threshold
@@ -78,11 +76,11 @@ class MetabolitePreprocessor:
         self.train_mean: Optional[np.ndarray] = None
         self.train_std: Optional[np.ndarray] = None
 
-    # ------------------------------------------------------------------ transforms
+    #transforms
     def log_transform(self, data: np.ndarray) -> np.ndarray:
         return np.log(np.clip(data.astype(np.float64), a_min=-self.log_epsilon + 1e-12, a_max=None) + self.log_epsilon)
 
-    # ------------------------------------------------------------------ fit / transform
+    #fit / transform
     def fit(self, long_df: pd.DataFrame, metabolite_names: Sequence[str]) -> "MetabolitePreprocessor":
         data = long_df[list(metabolite_names)]
         missingness = data.isnull().mean()
@@ -103,7 +101,6 @@ class MetabolitePreprocessor:
         return self.fit_statistics(long_df, self.valid_metabolites)
 
     def fit_statistics(self, long_df: pd.DataFrame, metabolite_names: Sequence[str]) -> "MetabolitePreprocessor":
-        """Recompute the log mean / std on ``long_df`` for a fixed metabolite list (no filtering)."""
         self.valid_metabolites = list(metabolite_names)
         log_data = self.log_transform(long_df[self.valid_metabolites].values)
         with warnings.catch_warnings():
@@ -114,7 +111,6 @@ class MetabolitePreprocessor:
         return self
 
     def transform(self, long_df: pd.DataFrame) -> Dict[str, np.ndarray]:
-        """Returns normalised values (N_rows, D), mask, times in hours and subject ids (row-aligned)."""
         raw = long_df[self.valid_metabolites].values.astype(np.float64)
         normalized = (self.log_transform(raw) - self.train_mean) / self.train_std
         return {
@@ -125,7 +121,6 @@ class MetabolitePreprocessor:
         }
 
     def inverse_transform(self, normalized: np.ndarray) -> np.ndarray:
-        """Normalised log space -> original concentration units."""
         return np.exp(normalized * self.train_std + self.train_mean) - self.log_epsilon
 
     # ------------------------------------------------------------------ persistence
@@ -157,7 +152,6 @@ class MetabolitePreprocessor:
 # Static features
 # =============================================================================
 class StaticFeatureProcessor:
-    """Standardised continuous features + one-hot categorical features, each with a mask."""
 
     def __init__(self, columns: Sequence[str], categorical_columns: Sequence[str]):
         self.requested_columns = list(columns)
@@ -206,7 +200,7 @@ class StaticFeatureProcessor:
         return self
 
     def transform(self, df: pd.DataFrame, subject_ids: Sequence[str]) -> np.ndarray:
-        """Returns (n_subjects, 2 * n_raw) float32 array ``[features, mask]`` in the order of subject_ids."""
+        """ (n_subjects, 2 * n_raw) float32 array"""
         rows = df.loc[list(subject_ids)]
         features, masks = [], []
         if self.continuous_columns:
@@ -250,7 +244,6 @@ def _categorical_value(value) -> str:
 
 
 def read_static_csv(path: str, subject_column: str) -> pd.DataFrame:
-    """Static / phenotype table indexed by the normalised subject id."""
     df = pd.read_csv(path)
     candidates = [c for c in df.columns if c.lower() == subject_column.lower()]
     if not candidates:
@@ -264,7 +257,6 @@ def read_static_csv(path: str, subject_column: str) -> pd.DataFrame:
 
 # dataset
 class TrajectoryDataset(Dataset):
-    """One item per subject: trajectory tensors sorted by time, plus optional static features."""
 
     def __init__(self, values: np.ndarray, mask: np.ndarray, times: np.ndarray, subject_ids: np.ndarray,
                  static: Optional[np.ndarray] = None, static_subject_ids: Optional[Sequence[str]] = None):
@@ -302,7 +294,6 @@ class TrajectoryDataset(Dataset):
 
 
 def collate_fn(batch: List[Dict]) -> Dict[str, torch.Tensor]:
-    """Pad variable-length trajectories; returns lengths and subject ids as well."""
     metabolites = pad_sequence([item["metabolites"] for item in batch], batch_first=True)
     mask = pad_sequence([item["mask"] for item in batch], batch_first=True)
     times = pad_sequence([item["times"] for item in batch], batch_first=True)
@@ -320,11 +311,6 @@ def _worker_init_fn(worker_id: int) -> None:
     random.seed(worker_seed)
 
 def assign_groups(metabolite_names: Sequence[str]) -> Tuple[List[str], Dict[str, List[int]]]:
-    """Map metabolites to groups with GROUP_RULES (rule order = group order).
-
-    Returns the non-empty group names in rule order and ``{group: [metabolite indices]}``.
-    Raises if a metabolite matches no rule or more than one rule.
-    """
     indices: Dict[str, List[int]] = {name: [] for name, _ in group_rules}
     for idx, met in enumerate(metabolite_names):
         matches = [name for name, rule in group_rules if rule(met)]
@@ -338,11 +324,6 @@ def assign_groups(metabolite_names: Sequence[str]) -> Tuple[List[str], Dict[str,
 
 
 def to_3d(values: np.ndarray, mask: np.ndarray, times: np.ndarray, subject_ids: np.ndarray):
-    """Row-wise arrays -> (n_subjects, n_times, n_metabolites) arrays in sorted subject order.
-
-    Requires every subject to have the same set of time points (true for the diet challenge data).
-    Returns values_3d, mask_3d, unique_times (hours) and the subject order.
-    """
     subject_ids = np.asarray([str(s) for s in subject_ids])
     subjects = sorted(set(subject_ids), key=_id_sort_key)
     unique_times = np.unique(times)

@@ -14,7 +14,7 @@ import torch.nn.functional as functional
 from torch.distributions import Normal, kl_divergence
 from torchdiffeq import odeint
 
-from config import Stage1Config, Stage2Config, get_beta_schedule
+from config import Stage1Config, Stage2Config
 
 
 # model components
@@ -509,7 +509,10 @@ def stage1_loss(model: GroupedLatentODE, batch: Dict, epoch: int, cfg: Stage1Con
     if cfg.free_bits > 0:
         kl = kl.clamp(min=cfg.free_bits)
     kl = kl.mean(dim=0).sum()
-    beta_kl = get_beta_schedule(epoch, cfg)
+    if epoch >= cfg.kl_anneal_epochs:
+        beta_kl = cfg.beta_end
+    else:
+        beta_kl = cfg.beta_start + epoch / cfg.kl_anneal_epochs * (cfg.beta_end - cfg.beta_start)
     ard = model.gating.compute_total_loss(cfg.lambda_ard, cfg.lambda_sparsity, cfg.target_sparsity)
     cross = model.grouped_decoder.compute_cross_group_penalty(cfg.lambda_cross_group, cfg.cross_group_penalty_type)
 
