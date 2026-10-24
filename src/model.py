@@ -1,19 +1,4 @@
 """Model components of the two-stage grouped latent ODE.
-
-Stage 1 (``GroupedLatentODE``)
-    X(0) ----------------> BaselineEncoder ---------> h_baseline --------------------------+
-    X(t) - X(0), mask ---> GRU-ODE encoder (backward) -> h_dynamic                        |
-    h = a * h_baseline + (1 - a) * h_dynamic  (a = sigmoid of a learnable scalar)         |
-    posterior q(z0 | X) = N(mu, sigma^2) -> z0 -> grouped ARD gating -> latent ODE -> z(t) -> gating
-    GroupedDecoder: X_pred(t) = X0_pred(h_baseline) + beta * sum_g sigmoid(l_g) * dec_g(z_g(t))
-
-Stage 2 (``FiLMZ0Predictor``)
-    static features -> StaticEncoder -> h_static
-    X(0) -> BaselineEncoder (copied from Stage 1, fine-tuned) -> h_baseline
-    [h_static, h_baseline] -> FiLM fusion (modulated by h_static) -> mu, logvar -> z0
-    z0 -> frozen latent ODE -> gating (frozen) -> GroupedDecoder (fine-tuned)
-
-Losses are at the bottom of the file (``stage1_loss``, ``stage2_loss``).
 """
 
 from __future__ import annotations

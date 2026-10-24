@@ -1,8 +1,5 @@
 """Evaluation utilities: reconstruction metrics, dynamic phenotype indices, cross-group agreement,
 z0 x phenotype correlations and the corresponding figures.
-
-All trajectory arrays are ``(n_subjects, n_times, n_metabolites)``; masks have the same shape
-(1 = observed). ``times_min`` is a 1-D array of time points in minutes.
 """
 
 from __future__ import annotations
